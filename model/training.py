@@ -4,6 +4,7 @@ from torchvision.datasets import VisionDataset
 from torchvision.transforms.v2 import Compose, RandomHorizontalFlip, ToDtype, ToImage, Resize, ToPILImage
 import PIL
 from torchvision.io import read_image
+from model import VAE
 
 class MyDataset(VisionDataset):
 
@@ -42,6 +43,11 @@ if __name__ == "__main__":
     im = data[0]
     print(im)
     print(im.shape)
-    im = ToPILImage()(im)
-    im.show()
+    im = im.reshape((1, 3, 128, 128))
+    #im = ToPILImage()(im)
+    v = VAE()
+    v.eval()
+    im = v.encoder_forward(im)
+    print(im)
+    #im.show()
 
