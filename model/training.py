@@ -47,7 +47,12 @@ if __name__ == "__main__":
     #im = ToPILImage()(im)
     v = VAE()
     v.eval()
-    im = v.encoder_forward(im)
-    print(im)
+    (mean, std) = v.encoder_forward(im)
+    samples = v.sample(mean, std)
+    print(samples.shape)
+    print(samples)
+
+    decoded = v.decoder_forward(samples)
+    print(decoded.shape)
     #im.show()
 

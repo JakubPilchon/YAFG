@@ -8,6 +8,8 @@ class VAE(nn.Module):
     def __init__(self) -> None:
         super(VAE, self).__init__()
 
+        self.latent_dim = 5
+
         self.encoder_body = nn.ModuleList([
             nn.Conv2d(3, 32, 2, 1),
             nn.ReLU(),
@@ -51,9 +53,36 @@ class VAE(nn.Module):
             nn.BatchNorm1d(128),
             nn.Dropout(0.2)
         ])
+        self.encoder_std = nn.Linear(128, self.latent_dim)
+        self.encoder_mean = nn.Linear(128, self.latent_dim)
 
-        self.encoder_std = nn.Linear(128, 3)
-        self.encoder_mean = nn.Linear(128, 3)
+        self.decoder = nn.ModuleList([
+            nn.Linear(self.latent_dim, 8*8*256),
+            nn.ReLU(),
+            nn.Unflatten(1, (256,8,8)),
+
+            nn.ConvTranspose2d(256, 128, 4, 2, 1),
+            nn.ReLU(),
+            nn.BatchNorm2d(128),
+            nn.Dropout2d(0.2),
+
+            nn.ConvTranspose2d(128, 64, 3, 1, 1),
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.Dropout2d(0.2),
+
+            nn.ConvTranspose2d(64, 32, 4, 2, 1),
+            nn.ReLU(),
+            nn.BatchNorm2d(32),
+            nn.Dropout2d(0.2),
+
+            nn.ConvTranspose2d(32, 16, 4, 2, 1),
+            nn.ReLU(),
+            nn.BatchNorm2d(16),
+            nn.Dropout2d(0.2),
+
+            nn.ConvTranspose2d(16, 3, 3, 1, 1)
+            ])
 
     def encoder_forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         for i, layer in enumerate(self.encoder_body):
@@ -64,5 +93,12 @@ class VAE(nn.Module):
 
         return (mean, std)
 
-    def decoder_forward(self, mean: torch.Tensor, std: torch.Tensor) -> torch.Tensor:
-        pass
+    def sample(self, mean: torch.Tensor, std: torch.Tensor) -> torch.Tensor:
+        eps = torch.distributions.normal.Normal(0., 1.).sample(mean.shape)
+        return eps * torch.exp(std * 0.5) + mean
+    
+    def decoder_forward(self, x:torch.Tensor) -> torch.Tensor:
+        for layer in self.decoder:
+            x = layer(x)
+
+        return x
