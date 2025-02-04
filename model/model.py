@@ -1,5 +1,7 @@
 import torch
+from tqdm import tqdm
 from torch import nn
+from torch.utils.tensorboard import SummaryWriter
 from typing import Tuple
 
 
@@ -81,7 +83,12 @@ class VAE(nn.Module):
             nn.BatchNorm2d(16),
             nn.Dropout2d(0.2),
 
-            nn.ConvTranspose2d(16, 3, 3, 1, 1)
+            nn.ConvTranspose2d(16, 8, 4, 2, 1),
+            nn.ReLU(),
+            nn.BatchNorm2d(8),
+            nn.Dropout2d(0.2),
+
+            nn.ConvTranspose2d(8, 3, 3, 1, 1)
             ])
 
     def encoder_forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -102,3 +109,80 @@ class VAE(nn.Module):
             x = layer(x)
 
         return x
+    
+    def kl_loss(self, mean: torch.Tensor, std: torch.Tensor) -> torch.Tensor:
+        return - 0.5 * torch.mean(1. + std - torch.square(mean) - torch.exp(std))
+    
+    def __generate_images(self, num: int = 5) -> torch.Tensor:
+        mean = torch.rand((num, self.latent_dim), dtype=torch.float)
+        std  = torch.rand((num, self.latent_dim), dtype=torch.float)
+
+        eps = self.sample(mean, std)
+        images = self.decoder_forward(eps)
+
+        return images
+
+    def fit(self,
+            train_dataloader : torch.utils.data.DataLoader,
+            valid_dataloader : torch.utils.data.DataLoader,
+            epochs: int = 1 ,
+            logs_dir : str = "model/logs",
+            lr: float  = 0.001 
+            ) -> None:
+        
+        #KL_LOSS = torch.nn.KLDivLoss(reduction="batchmean")
+        L2_LOSS = torch.nn.MSELoss()
+        OPTIMIZER = torch.optim.Adam(self.parameters(), lr = lr)
+        WRITER = SummaryWriter(logs_dir)
+
+        for e in range(1, 1+epochs):
+            
+            print(f"Epoch: {e}")
+
+            train_loss = 0
+            valid_loss = 0
+
+            tqdm_dataloader = tqdm(train_dataloader)
+            for i, train_data in enumerate(tqdm_dataloader):
+
+                OPTIMIZER.zero_grad()
+
+                mean, std = self.encoder_forward(train_data)
+                eps = self.sample(mean, std)
+                decoded = self.decoder_forward(eps)
+
+                kl_loss = self.kl_loss(mean, std)
+                l2_loss = L2_LOSS(train_data, decoded)
+                loss = kl_loss + l2_loss
+                loss.backward()
+
+                OPTIMIZER.step()
+
+                train_loss += loss.item()
+
+                tqdm_dataloader.set_postfix({"LOSS": loss.item(), "KL:": kl_loss.item(), "L2:": l2_loss.item()})
+                WRITER.add_scalars("losses", {"LOSS": loss.item(), "KL:": kl_loss.item(), "L2:": l2_loss.item()}, global_step=e*len(train_dataloader)+i)
+            
+            with torch.no_grad():
+                for valid_data in valid_dataloader:
+                    mean, std = self.encoder_forward(valid_data)
+                    eps = self.sample(mean, std)
+                    decoded = self.decoder_forward(eps)
+
+                    kl_loss = self.kl_loss(mean, std)
+                    l2_loss = L2_LOSS(valid_data, decoded)
+                    loss = kl_loss + l2_loss
+
+                    valid_loss += loss.item()
+
+                images = self.__generate_images()
+
+                WRITER.add_images("Generated images", images, global_step=e)
+
+
+                WRITER.add_scalar("VAL_LOSS", valid_loss/len(valid_data), e*len(train_dataloader))
+
+        
+            print(f"    Avg Loss: {train_loss/len(train_dataloader)} Valid Loss {valid_loss/len(valid_dataloader)}")
+
+                

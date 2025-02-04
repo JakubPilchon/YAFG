@@ -1,5 +1,6 @@
 import os
 import torch
+from torch.utils.data import DataLoader, random_split
 from torchvision.datasets import VisionDataset
 from torchvision.transforms.v2 import Compose, RandomHorizontalFlip, ToDtype, ToImage, Resize, ToPILImage
 import PIL
@@ -40,19 +41,11 @@ transforms = Compose([
 
 if __name__ == "__main__":
     data = MyDataset("images", transforms=transforms)
-    im = data[0]
-    print(im)
-    print(im.shape)
-    im = im.reshape((1, 3, 128, 128))
-    #im = ToPILImage()(im)
-    v = VAE()
-    v.eval()
-    (mean, std) = v.encoder_forward(im)
-    samples = v.sample(mean, std)
-    print(samples.shape)
-    print(samples)
+    train_data, valid_data = random_split(data, (0.8, 0.2))
+    train_data = DataLoader(train_data, 32, True)
+    valid_data = DataLoader(valid_data, 32, True)
 
-    decoded = v.decoder_forward(samples)
-    print(decoded.shape)
-    #im.show()
+    v = VAE()
+    v.fit(train_data, valid_data, 5)
+
 
