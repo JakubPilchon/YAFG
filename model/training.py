@@ -32,6 +32,7 @@ class MyDataset(VisionDataset):
         return image
 
 transforms = Compose([
+
     ToImage(),
     Resize((128, 128)),
     RandomHorizontalFlip(),
@@ -42,10 +43,13 @@ transforms = Compose([
 if __name__ == "__main__":
     data = MyDataset("images", transforms=transforms)
     train_data, valid_data = random_split(data, (0.8, 0.2))
-    train_data = DataLoader(train_data, 32, True)
-    valid_data = DataLoader(valid_data, 32, True)
+    train_data = DataLoader(train_data, 64, True)
+    valid_data = DataLoader(valid_data, 64, True)
 
+
+    #lookup https://stats.stackexchange.com/questions/341954/balancing-reconstruction-vs-kl-loss-variational-autoencoder
     v = VAE()
-    v.fit(train_data, valid_data, 5)
+    v.fit(train_data, valid_data, 10, logs_dir = "model/logs/log_3",    cuda_available = torch.cuda.is_available())
+
 
 

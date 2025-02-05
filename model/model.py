@@ -10,7 +10,7 @@ class VAE(nn.Module):
     def __init__(self) -> None:
         super(VAE, self).__init__()
 
-        self.latent_dim = 5
+        self.latent_dim = 16
 
         self.encoder_body = nn.ModuleList([
             nn.Conv2d(3, 32, 2, 1),
@@ -51,9 +51,9 @@ class VAE(nn.Module):
             nn.Dropout(0.2),
             
             nn.Linear(258, 128),
-            nn.ReLU(),
-            nn.BatchNorm1d(128),
-            nn.Dropout(0.2)
+            nn.Tanh(),
+            #nn.BatchNorm1d(128),
+            #nn.Dropout(0.2)
         ])
         self.encoder_std = nn.Linear(128, self.latent_dim)
         self.encoder_mean = nn.Linear(128, self.latent_dim)
@@ -80,15 +80,16 @@ class VAE(nn.Module):
 
             nn.ConvTranspose2d(32, 16, 4, 2, 1),
             nn.ReLU(),
-            nn.BatchNorm2d(16),
-            nn.Dropout2d(0.2),
+            #nn.BatchNorm2d(16),
+            #nn.Dropout2d(0.2),
 
             nn.ConvTranspose2d(16, 8, 4, 2, 1),
             nn.ReLU(),
-            nn.BatchNorm2d(8),
-            nn.Dropout2d(0.2),
+            #nn.BatchNorm2d(8),
+            #nn.Dropout2d(0.2),
 
-            nn.ConvTranspose2d(8, 3, 3, 1, 1)
+            nn.ConvTranspose2d(8, 3, 3, 1, 1),
+            nn.Sigmoid()
             ])
 
     def encoder_forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -100,8 +101,8 @@ class VAE(nn.Module):
 
         return (mean, std)
 
-    def sample(self, mean: torch.Tensor, std: torch.Tensor) -> torch.Tensor:
-        eps = torch.distributions.normal.Normal(0., 1.).sample(mean.shape)
+    def sample(self, mean: torch.Tensor, std: torch.Tensor, device: torch.device) -> torch.Tensor:
+        eps = torch.distributions.normal.Normal(0., 1.).sample(mean.shape).to(device)
         return eps * torch.exp(std * 0.5) + mean
     
     def decoder_forward(self, x:torch.Tensor) -> torch.Tensor:
@@ -113,11 +114,11 @@ class VAE(nn.Module):
     def kl_loss(self, mean: torch.Tensor, std: torch.Tensor) -> torch.Tensor:
         return - 0.5 * torch.mean(1. + std - torch.square(mean) - torch.exp(std))
     
-    def __generate_images(self, num: int = 5) -> torch.Tensor:
-        mean = torch.rand((num, self.latent_dim), dtype=torch.float)
-        std  = torch.rand((num, self.latent_dim), dtype=torch.float)
+    def __generate_images(self, num: int = 5, device = torch.device("cpu")) -> torch.Tensor:
+        mean = torch.empty((num, self.latent_dim)).normal_().to(device) #torch.rand((num, self.latent_dim), dtype=torch.float).to(device)
+        std  = torch.empty((num, self.latent_dim)).normal_().to(device) #torch.rand((num, self.latent_dim), dtype=torch.float).to(device)
 
-        eps = self.sample(mean, std)
+        eps = self.sample(mean, std, device)
         images = self.decoder_forward(eps)
 
         return images
@@ -127,6 +128,7 @@ class VAE(nn.Module):
             valid_dataloader : torch.utils.data.DataLoader,
             epochs: int = 1 ,
             logs_dir : str = "model/logs",
+            cuda_available: bool = False,
             lr: float  = 0.001 
             ) -> None:
         
@@ -134,6 +136,15 @@ class VAE(nn.Module):
         L2_LOSS = torch.nn.MSELoss()
         OPTIMIZER = torch.optim.Adam(self.parameters(), lr = lr)
         WRITER = SummaryWriter(logs_dir)
+        BETA = 0.04
+
+        if cuda_available:
+            device = torch.device("cuda")
+            print("Loading model into gpu")
+        else:
+            device = torch.device("cpu")
+
+        self.to(device)
 
         for e in range(1, 1+epochs):
             
@@ -145,15 +156,17 @@ class VAE(nn.Module):
             tqdm_dataloader = tqdm(train_dataloader)
             for i, train_data in enumerate(tqdm_dataloader):
 
+                train_data  = train_data.to(device)
+
                 OPTIMIZER.zero_grad()
 
                 mean, std = self.encoder_forward(train_data)
-                eps = self.sample(mean, std)
+                eps = self.sample(mean, std, device)
                 decoded = self.decoder_forward(eps)
 
                 kl_loss = self.kl_loss(mean, std)
                 l2_loss = L2_LOSS(train_data, decoded)
-                loss = kl_loss + l2_loss
+                loss = BETA *  kl_loss + l2_loss
                 loss.backward()
 
                 OPTIMIZER.step()
@@ -165,8 +178,11 @@ class VAE(nn.Module):
             
             with torch.no_grad():
                 for valid_data in valid_dataloader:
+
+                    valid_data = valid_data.to(device)
+
                     mean, std = self.encoder_forward(valid_data)
-                    eps = self.sample(mean, std)
+                    eps = self.sample(mean, std, device)
                     decoded = self.decoder_forward(eps)
 
                     kl_loss = self.kl_loss(mean, std)
@@ -175,10 +191,9 @@ class VAE(nn.Module):
 
                     valid_loss += loss.item()
 
-                images = self.__generate_images()
+                images = self.__generate_images(device=device)
 
                 WRITER.add_images("Generated images", images, global_step=e)
-
 
                 WRITER.add_scalar("VAL_LOSS", valid_loss/len(valid_data), e*len(train_dataloader))
 
