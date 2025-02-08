@@ -60,31 +60,31 @@ class VAE(nn.Module):
 
         self.decoder = nn.ModuleList([
             nn.Linear(self.latent_dim, 8*8*256),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Unflatten(1, (256,8,8)),
 
             nn.ConvTranspose2d(256, 128, 4, 2, 1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.BatchNorm2d(128),
             nn.Dropout2d(0.2),
 
             nn.ConvTranspose2d(128, 64, 3, 1, 1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.BatchNorm2d(64),
             nn.Dropout2d(0.2),
 
             nn.ConvTranspose2d(64, 32, 4, 2, 1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.BatchNorm2d(32),
             nn.Dropout2d(0.2),
 
             nn.ConvTranspose2d(32, 16, 4, 2, 1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             #nn.BatchNorm2d(16),
             #nn.Dropout2d(0.2),
 
             nn.ConvTranspose2d(16, 8, 4, 2, 1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             #nn.BatchNorm2d(8),
             #nn.Dropout2d(0.2),
 
