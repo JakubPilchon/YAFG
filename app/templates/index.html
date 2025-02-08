@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block body %}
+    <div id="content">
+        <h1 style="margin-left: 5px;">Parameters</h1>
+        <form action="/action_page.php" method="get">
+            <label for="parameters">Parameters:</label>
+            <input type="range"  name="p1" min="0" max="100">
+            <input type="range"  name="p2" min="0" max="100">
+            <input type="range"  name="p3" min="0" max="100">
+            <input type="range"  name="p4" min="0" max="100">
+
+            <label for="parameters">Temperature</label>
+            <input type="range"  name="t" min="0" max="100">
+
+            <input type="submit" value="Submit">
+        </form>
+
+    </div>
+{% endblock %}
