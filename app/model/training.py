@@ -49,8 +49,8 @@ if __name__ == "__main__":
 
     #lookup https://stats.stackexchange.com/questions/341954/balancing-reconstruction-vs-kl-loss-variational-autoencoder
     v = VAE()
-    v.fit(train_data, valid_data, 5, logs_dir = "model/logs/log_2",    cuda_available = torch.cuda.is_available())
+    v.fit(train_data, valid_data, 8, logs_dir = "logs/log_2",    cuda_available = torch.cuda.is_available())
 
-    torch.save(v, "saved_model.pt")
+    torch.save(v.state_dict(), "saved_model.pt")
 
 
