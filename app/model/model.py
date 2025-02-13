@@ -1,7 +1,5 @@
 import torch
-from tqdm import tqdm
 from torch import nn
-from torch.utils.tensorboard import SummaryWriter
 from typing import Tuple
 
 
@@ -114,7 +112,7 @@ class VAE(nn.Module):
     def kl_loss(self, mean: torch.Tensor, std: torch.Tensor) -> torch.Tensor:
         return - 0.5 * torch.mean(1. + std - torch.square(mean) - torch.exp(std))
     
-    def __generate_images(self, num: int = 5, device = torch.device("cpu")) -> torch.Tensor:
+    def generate_images(self, num: int = 5, device = torch.device("cpu")) -> torch.Tensor:
         mean = torch.empty((num, self.latent_dim)).normal_().to(device) #torch.rand((num, self.latent_dim), dtype=torch.float).to(device)
         std  = torch.empty((num, self.latent_dim)).normal_().to(device) #torch.rand((num, self.latent_dim), dtype=torch.float).to(device)
 
@@ -123,81 +121,5 @@ class VAE(nn.Module):
 
         return images
 
-    def fit(self,
-            train_dataloader : torch.utils.data.DataLoader,
-            valid_dataloader : torch.utils.data.DataLoader,
-            epochs: int = 1 ,
-            logs_dir : str = "model/logs",
-            cuda_available: bool = False,
-            lr: float  = 0.001 
-            ) -> None:
-        
-        #KL_LOSS = torch.nn.KLDivLoss(reduction="batchmean")
-        L2_LOSS = torch.nn.MSELoss()
-        OPTIMIZER = torch.optim.Adam(self.parameters(), lr = lr)
-        WRITER = SummaryWriter(logs_dir)
-        BETA = 0.04
-
-        if cuda_available:
-            device = torch.device("cuda")
-            print("Loading model into gpu")
-        else:
-            device = torch.device("cpu")
-
-        self.to(device)
-
-        for e in range(1, 1+epochs):
-            
-            print(f"Epoch: {e}")
-
-            train_loss = 0
-            valid_loss = 0
-
-            tqdm_dataloader = tqdm(train_dataloader)
-            for i, train_data in enumerate(tqdm_dataloader):
-
-                train_data  = train_data.to(device)
-
-                OPTIMIZER.zero_grad()
-
-                mean, std = self.encoder_forward(train_data)
-                eps = self.sample(mean, std, device)
-                decoded = self.decoder_forward(eps)
-
-                kl_loss = self.kl_loss(mean, std)
-                l2_loss = L2_LOSS(train_data, decoded)
-                loss = BETA *  kl_loss + l2_loss
-                loss.backward()
-
-                OPTIMIZER.step()
-
-                train_loss += loss.item()
-
-                tqdm_dataloader.set_postfix({"LOSS": loss.item(), "KL:": kl_loss.item(), "L2:": l2_loss.item()})
-                WRITER.add_scalars("losses", {"LOSS": loss.item(), "KL:": kl_loss.item(), "L2:": l2_loss.item()}, global_step=e*len(train_dataloader)+i)
-            
-            with torch.no_grad():
-                for valid_data in valid_dataloader:
-
-                    valid_data = valid_data.to(device)
-
-                    mean, std = self.encoder_forward(valid_data)
-                    eps = self.sample(mean, std, device)
-                    decoded = self.decoder_forward(eps)
-
-                    kl_loss = self.kl_loss(mean, std)
-                    l2_loss = L2_LOSS(valid_data, decoded)
-                    loss = kl_loss + l2_loss
-
-                    valid_loss += loss.item()
-
-                images = self.__generate_images(device=device)
-
-                WRITER.add_images("Generated images", images, global_step=e)
-
-                WRITER.add_scalar("VAL_LOSS", valid_loss/len(valid_data), e*len(train_dataloader))
-
-        
-            print(f"    Avg Loss: {train_loss/len(train_dataloader)} Valid Loss {valid_loss/len(valid_dataloader)}")
-
+    
                 

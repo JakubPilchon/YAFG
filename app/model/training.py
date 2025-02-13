@@ -6,6 +6,8 @@ from torchvision.transforms.v2 import Compose, RandomHorizontalFlip, ToDtype, To
 import PIL
 from torchvision.io import read_image
 from model import VAE
+from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
 
 class MyDataset(VisionDataset):
 
@@ -39,6 +41,62 @@ transforms = Compose([
     ToDtype(torch.float32, scale=True)
 ])
         
+def fit(model : torch.nn.Module,
+        train_dataloader : torch.utils.data.DataLoader,
+        valid_dataloader : torch.utils.data.DataLoader,
+        epochs: int = 1 ,
+        logs_dir : str = "model/logs",
+        cuda_available: bool = False,
+        lr: float  = 0.001 
+        ) -> None:
+    
+    #KL_LOSS = torch.nn.KLDivLoss(reduction="batchmean")
+    L2_LOSS = torch.nn.MSELoss()
+    OPTIMIZER = torch.optim.Adam(model.parameters(), lr = lr)
+    WRITER = SummaryWriter(logs_dir)
+    BETA = 0.04
+    if cuda_available:
+        device = torch.device("cuda")
+        print("Loading model into gpu")
+    else:
+        device = torch.device("cpu")
+    model.to(device)
+    for e in range(1, 1+epochs):
+        
+        print(f"Epoch: {e}")
+        train_loss = 0
+        valid_loss = 0
+        tqdm_dataloader = tqdm(train_dataloader)
+        for i, train_data in enumerate(tqdm_dataloader):
+            train_data  = train_data.to(device)
+            OPTIMIZER.zero_grad()
+            mean, std = model.encoder_forward(train_data)
+            eps = model.sample(mean, std, device)
+            decoded = model.decoder_forward(eps)
+            kl_loss = model.kl_loss(mean, std)
+            l2_loss = L2_LOSS(train_data, decoded)
+            loss = BETA *  kl_loss + l2_loss
+            loss.backward()
+            OPTIMIZER.step()
+            train_loss += loss.item()
+            tqdm_dataloader.set_postfix({"LOSS": loss.item(), "KL:": kl_loss.item(), "L2:": l2_loss.item()})
+            WRITER.add_scalars("losses", {"LOSS": loss.item(), "KL:": kl_loss.item(), "L2:": l2_loss.item()}, global_step=e*len(train_dataloader)+i)
+        
+        with torch.no_grad():
+            for valid_data in valid_dataloader:
+                valid_data = valid_data.to(device)
+                mean, std = model.encoder_forward(valid_data)
+                eps = model.sample(mean, std, device)
+                decoded = model.decoder_forward(eps)
+                kl_loss = model.kl_loss(mean, std)
+                l2_loss = L2_LOSS(valid_data, decoded)
+                loss = kl_loss + l2_loss
+                valid_loss += loss.item()
+            images = model.generate_images(device=device)
+            WRITER.add_images("Generated images", images, global_step=e)
+            WRITER.add_scalar("VAL_LOSS", valid_loss/len(valid_data), e*len(train_dataloader))
+    
+        print(f"    Avg Loss: {train_loss/len(train_dataloader)} Valid Loss {valid_loss/len(valid_dataloader)}")
 
 if __name__ == "__main__":
     data = MyDataset("images", transforms=transforms)
@@ -49,7 +107,12 @@ if __name__ == "__main__":
 
     #lookup https://stats.stackexchange.com/questions/341954/balancing-reconstruction-vs-kl-loss-variational-autoencoder
     v = VAE()
-    v.fit(train_data, valid_data, 8, logs_dir = "logs/log_2",    cuda_available = torch.cuda.is_available())
+    fit(model=v,
+        train_dataloader=train_data,
+        valid_dataloader=valid_data,
+        epochs=8,
+        logs_dir = "logs/log_1",
+        cuda_available = torch.cuda.is_available())
 
     torch.save(v.state_dict(), "saved_model.pt")
 
