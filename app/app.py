@@ -8,7 +8,7 @@ LATENT_DIM = 16
 app = Flask("YAFG",template_folder='app/templates', static_folder='app/static')
 
 model = VAE()
-model.load_state_dict(torch.load("app/saved_model.pt", weights_only=True), strict=False)
+model.load_state_dict(torch.load("app/saved_model.pt", weights_only=True, map_location=torch.device("cpu")), strict=False)
 model.to("cpu")
 
 @app.route('/')
@@ -26,4 +26,4 @@ def send_data():
         return render_template("index.html")
 
 if __name__ == "__main__": 
-    app.run(debug=True)
+    app.run(host="0.0.0.0",port=5000, debug=False)

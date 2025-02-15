@@ -1,0 +1,4 @@
+app/model/__pycache__
+app/model/training.py
+app/__pycache__
+app/static/image.png
