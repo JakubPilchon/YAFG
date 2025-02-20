@@ -33,6 +33,14 @@ def generate_image(model: torch.nn.Module,
         img = to_pil_image(img[0])
         img.save('app/static/image.png')
 
+def alt_generate_image(model: torch.nn.Module,
+                       mean_vec: torch.Tensor
+                       ) -> None:
+    with torch.no_grad():
+        img = model.decoder_forward(mean_vec)
+        img = to_pil_image(img[0])
+        img.save('app/static/image.png')
+
 def generate_name() -> str:
     name_gen = ["ma", "mo", "ka", "ko", "ke", "lo", "ro", "ni", "mi", "vi", "wa", "na", "go"]
     return "".join(random.choices(name_gen, k=3)).capitalize()
