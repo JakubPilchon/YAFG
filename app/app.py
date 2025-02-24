@@ -4,7 +4,7 @@ from model_handling import preprocess, generate_image, generate_name, alt_genera
 from model.model import VAE
 import torch
 
-LATENT_DIM = 16
+LATENT_DIM = 32
 app = Flask("YAFG",template_folder='app/templates', static_folder='app/static')
 
 model = VAE()
