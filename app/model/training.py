@@ -53,8 +53,8 @@ def fit(model : torch.nn.Module,
         ) -> None:
     
     #KL_LOSS = torch.nn.KLDivLoss(reduction="batchmean")
-    #L2_LOSS = torch.nn.MSELoss()
-    L2_LOSS = torch.nn.BCELoss(reduction="sum")
+    L2_LOSS = torch.nn.MSELoss()
+    #L2_LOSS = torch.nn.BCELoss(reduction="mean")
     #L2_LOSS = torch.nn.functional.binary_cross_entropy
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr = lr)
     WRITER = SummaryWriter(logs_dir)
@@ -132,39 +132,9 @@ if __name__ == "__main__":
     v = VAE()
     fit(model=v,train_dataloader=train_data,
         valid_dataloader=valid_data,
-        epochs=8,
-        logs_dir = "logs/log_5",
+        epochs=4,
+        logs_dir = "logs/log_final",
         cuda_available = torch.cuda.is_available())
     
-    torch.save(v.state_dict(), "saved_model.pt")
 
-    #gpu = torch.device("cuda")
-    #BC_loss = torch.nn.BCELoss(reduction="mean")
-    #OPTIMIZER = torch.optim.Adam(v.parameters(), lr = 0.001)
-    #for n in range(6):
-    #    try:
-    #        OPTIMIZER.zero_grad()
-    #        test_data = next(iter(train_data))
-    #        test_data = torch.clamp(test_data, 0 + 1e-6, 1. - 1e-6)
-    #        #test_data = torch.reshape(test_data, (1, 3, 128, 128))
-    #        test_data = test_data.to(gpu)
-    #        v.to(gpu)
-    #        m, s = v.encoder_forward(test_data)
-    #        generated = v.decoder_forward(v.sample(m, s, gpu))
-    #        loss = BC_loss(test_data.view(-1, 128*128*3), generated.view(-1, 128*128*3))
-    #        loss.backward()
-    #        OPTIMIZER.step()
-    #    except Exception:
-    #        print(n, torch.max(test_data), torch.min(test_data))
-#
-    #e = 0
-    #with torch.no_grad():
-    #    images = v.generate_images(device=gpu)
-    #    fig, ax = plt.subplots(1, 5, figsize=(7.5, 2.5))
-    #    fig.suptitle(f"Epoch {e}")
-    #    for n in range(5):
-    #        ax[n].imshow(torch.reshape(images[n], (128,128,3)).numpy())
-    #        ax[n].axis("off")
-    #        fig.savefig(f"plot_{e}.png")
-#
-    #print(loss(test_data, generated).item())
+    torch.save(v.state_dict(), "saved_model.pt")
