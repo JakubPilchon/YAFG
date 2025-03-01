@@ -7,12 +7,6 @@ import random
 def preprocess(parameters: Dict[str, str], latent_dim: int) -> Tuple[torch.Tensor, torch.Tensor]:
     shape = (1, latent_dim)
     means_vector = torch.distributions.normal.Normal(0.0, 1.0).sample(shape)
-    #means_vector = torch.zeros(shape)
-    std_vector = torch.zeros(shape)
-
-    std = float(parameters["t"])
-    std = std / 50 + 1e-2
-    std_vector += std
 
     for i in range(latent_dim):
 
@@ -21,19 +15,9 @@ def preprocess(parameters: Dict[str, str], latent_dim: int) -> Tuple[torch.Tenso
 
         means_vector[0, i-1] = mean
 
-    return (means_vector, std_vector)
+    return means_vector
 
-def generate_image(model: torch.nn.Module, 
-                   mean_vec: torch.Tensor, 
-                   std_vec: torch.Tensor
-                   ) -> None:
-    with torch.no_grad():
-        eps = model.sample(mean_vec, std_vec, torch.device("cpu"))
-        img = model.decoder_forward(eps)
-        img = to_pil_image(img[0])
-        img.save('app/static/image.png')
-
-def alt_generate_image(model: torch.nn.Module,
+def generate_image(model: torch.nn.Module,
                        mean_vec: torch.Tensor
                        ) -> None:
     with torch.no_grad():

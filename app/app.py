@@ -1,6 +1,6 @@
 from flask import Flask, render_template, url_for, request
 from typing import Dict
-from model_handling import preprocess, generate_image, generate_name, alt_generate_image
+from model_handling import preprocess, generate_image, generate_name
 from model.model import VAE
 import torch
 
@@ -18,8 +18,8 @@ def index():
 @app.route("/image", methods=["POST", "GET"])
 def send_data():
     if request.method == "POST":
-            (means, std) = preprocess(request.form, LATENT_DIM)
-            alt_generate_image(model, means)
+            means = preprocess(request.form, LATENT_DIM)
+            generate_image(model, means)
 
             return render_template("images.html", name = generate_name())
     else:
